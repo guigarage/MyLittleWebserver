@@ -14,9 +14,9 @@ public class Client {
 
     public static void main(String[] args) {
 
-        ExecutorService parallelService = Executors.newFixedThreadPool(20);
+        ExecutorService parallelService = Executors.newFixedThreadPool(2000);
 
-        IntStream.range(1, 20).forEach( e -> {
+        IntStream.range(1, 200000).forEach( e -> {
             parallelService.execute(() -> {
                 try {
                     long startTime = System.currentTimeMillis();
