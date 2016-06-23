@@ -14,19 +14,21 @@ public class Client {
 
     public static void main(String[] args) {
 
-        ExecutorService parallelService = Executors.newFixedThreadPool(2000);
+        for(int i = 0; i<10; i++) {
+            ExecutorService parallelService = Executors.newFixedThreadPool(1000);
 
-        IntStream.range(1, 200000).forEach( e -> {
-            parallelService.execute(() -> {
-                try {
-                    long startTime = System.currentTimeMillis();
-                    URL url = new URL("http://localhost:8080/hello");
-                    System.out.println(IOUtils.toString(url.openStream()) + " - Request took " + (System.currentTimeMillis() - startTime) + " ms");
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
+            IntStream.range(1, Integer.MAX_VALUE).forEach(e -> {
+                parallelService.execute(() -> {
+                    try {
+                        long startTime = System.currentTimeMillis();
+                        URL url = new URL("http://localhost:8080/hello");
+                        System.out.println(IOUtils.toString(url.openStream()) + " - Request took " + (System.currentTimeMillis() - startTime) + " ms");
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                });
             });
-        });
+        }
 
     }
 

@@ -29,7 +29,7 @@ public class MyLittleWebservice {
 
     public MyLittleWebservice() {
 
-        int maxThreads = Integer.MAX_VALUE;
+        int maxThreads = 200;
         int minThreads = 10;
         int timeOutMillis = 30;
         Spark.threadPool(maxThreads, minThreads, timeOutMillis);
