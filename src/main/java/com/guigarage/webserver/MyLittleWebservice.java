@@ -1,8 +1,6 @@
 package com.guigarage.webserver;
 
 import spark.Request;
-import spark.Response;
-import spark.Route;
 import spark.Spark;
 
 import java.util.HashMap;
@@ -15,29 +13,47 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Created by hendrikebbers on 23.06.16.
  */
-public class MyLittleWebservice implements Route {
+public class MyLittleWebservice {
 
     private final IdentityHashMap<Request, Request> waitingRequests = new IdentityHashMap();
 
     private final Map<Request, String> handledRequests = new HashMap<>();
 
-    private final Lock synchronizer = new ReentrantLock();
+    private final Lock requestLock = new ReentrantLock();
 
-    private final Condition handleCondition = synchronizer.newCondition();
+    private final Lock responseLock = new ReentrantLock();
 
-    private final Condition incomingCondition = synchronizer.newCondition();
+    private final Condition incomingCondition = requestLock.newCondition();
+
+    private final Condition handleCondition = responseLock.newCondition();
 
     public MyLittleWebservice() {
-        Spark.get("/hello", this);
+
+        int maxThreads = 80;
+        int minThreads = 10;
+        int timeOutMillis = 30;
+        Spark.threadPool(maxThreads, minThreads, timeOutMillis);
+
+        Spark.port(8080);
+
+        Spark.get("/hello", (request, response) -> handle(request));
+
+        Spark.awaitInitialization();
     }
 
-    @Override
-    public synchronized Object handle(Request request, Response response) {
-        synchronizer.lock();
+    private String handle(Request request) {
+        requestLock.lock();
         try {
+            System.out.println("Received Request " + request.toString());
             waitingRequests.put(request, request);
             incomingCondition.signalAll();
+        } finally {
+            requestLock.unlock();
+        }
 
+
+        responseLock.lock();
+        try {
             while (!handledRequests.containsKey(request)) {
                 try {
                     handleCondition.await();
@@ -46,25 +62,34 @@ public class MyLittleWebservice implements Route {
                 }
             }
 
-            return handledRequests.get(request);
+            System.out.println("Send Response for  Request " + request.toString());
+            return handledRequests.remove(request);
         } finally {
-            synchronizer.unlock();
+            responseLock.unlock();
         }
     }
 
     public void handled(Request request, String responseContent) {
-        synchronizer.lock();
+        System.out.println("Response " + request.toString() + " handled");
+
+        requestLock.lock();
         try {
             waitingRequests.remove(request);
+        } finally {
+            requestLock.unlock();
+        }
+
+        responseLock.lock();
+        try {
             handledRequests.put(request, responseContent);
             handleCondition.signalAll();
         } finally {
-            synchronizer.unlock();
+            responseLock.unlock();
         }
     }
 
     public HttpRequest getNextRequest() {
-        synchronizer.lock();
+        requestLock.lock();
         try {
             while (waitingRequests.isEmpty()) {
                 try {
@@ -73,9 +98,11 @@ public class MyLittleWebservice implements Route {
                     throw new RuntimeException(e);
                 }
             }
-            return new HttpRequest(waitingRequests.keySet().iterator().next(), this);
+            Request request = waitingRequests.keySet().iterator().next();
+            System.out.println("Will handle Response " + request.toString());
+            return new HttpRequest(waitingRequests.remove(request), this);
         } finally {
-            synchronizer.unlock();
+            requestLock.unlock();
         }
     }
 }
